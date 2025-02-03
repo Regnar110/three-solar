@@ -4,6 +4,11 @@ import spacetexture from './textures/milkyway.jpg'
 import sunTexture from './textures/sun.jpg'
 import earthTexture from './textures/earth.jpg';
 
+const RADIUS_CONTROLS = {
+    SUN: 20,
+    EARTH: 3
+}
+
 function main() {
     const canvasRootEl = document.getElementById('root');
     const scene = new THREE.Scene();
@@ -27,7 +32,7 @@ function main() {
 
     const fov = 45;
     const near = 1;
-    const far = 600;
+    const far = 50000;
     const aspect = window.innerWidth / window.innerHeight;
     const camera = new THREE.PerspectiveCamera(fov, aspect, near, far);
 	camera.position.set( 0, 0, 400 )
@@ -40,13 +45,21 @@ function main() {
 
 	//controls.addEventListener( 'change', render ); // call this only in static scenes (i.e., if there is no animation loop)
 
+    // damping - efekt poślizgu kamery
 	controls.enableDamping = true; // an animation loop is required when either damping or auto-rotation are enabled
 	controls.dampingFactor = 0.05;
 
 	controls.screenSpacePanning = false;
-	controls.minDistance = 0;
-	controls.maxDistance = 500;
-	controls.minPolarAngle = 0;
+
+    //Minimalny dystans kamery od centrum sceny
+	controls.minDistance = 500;
+
+    // maksymalny dystans kamery od centrum sceny
+	controls.maxDistance = Infinity;
+
+    // minilany kąt w osi Y do jakiego możemy obrócić kamerę
+	controls.minPolarAngle = .3;
+    // maksymalny kąt w osi Y do jakiego możemy obrócić kamerę
 	controls.maxPolarAngle = Math.PI / 2;
 
 
@@ -66,7 +79,7 @@ function main() {
     scene.add(pointLightHelper);
 
     const sunOrbit = new THREE.Object3D();
-    const sunGeometry = new THREE.SphereGeometry(60, 124, 124);
+    const sunGeometry = new THREE.SphereGeometry(RADIUS_CONTROLS.SUN, 124, 124);
     const sunMaterial = new THREE.MeshBasicMaterial({ map: textureLoader.load(sunTexture) });
     const sunMesh = new THREE.Mesh(sunGeometry, sunMaterial);
 
@@ -75,7 +88,12 @@ function main() {
     const earthOrbit = new THREE.Object3D();
 	earthOrbit.add(axesHelper)
 
-    const earthGeometry = new THREE.SphereGeometry(6, 8, 8);
+    const earthOrbitLine = new THREE.CircleGeometry(100, 1000);
+    earthOrbitLine.rotateX(Math.PI / 2);
+    const earthOrbitLineMaterial = new THREE.LineDashedMaterial( { color: 'black' } );
+    const earthOrbitLineMesh = new THREE.Line( earthOrbitLine, earthOrbitLineMaterial );
+    scene.add(earthOrbitLineMesh)
+    const earthGeometry = new THREE.SphereGeometry(RADIUS_CONTROLS.EARTH, 8, 8);
     const earthMaterial = new THREE.MeshPhongMaterial({ map: textureLoader.load(earthTexture) });
     const earthMesh = new THREE.Mesh(earthGeometry, earthMaterial);
     earthOrbit.position.x = -200;
