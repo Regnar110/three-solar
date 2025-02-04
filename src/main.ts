@@ -2,7 +2,8 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import spacetexture from './textures/milkyway.jpg'
 import sunTexture from './textures/sun.jpg'
-import earthTexture from './textures/earth.jpg';
+import { PlanetEarth } from './planets/Earth';
+import { StarSun } from './planets/Sun';
 
 const RADIUS_CONTROLS = {
     SUN: 20,
@@ -36,10 +37,6 @@ function main() {
     const aspect = window.innerWidth / window.innerHeight;
     const camera = new THREE.PerspectiveCamera(fov, aspect, near, far);
 	camera.position.set( 0, 0, 400 )
-	// const helper = new THREE.CameraHelper( camera );
-	// scene.add( helper );
-    const worldOrbitRadius = 200;
-    let angle = 0;
 
 	const controls = new OrbitControls( camera, renderer.domElement );
 
@@ -68,50 +65,49 @@ function main() {
     controls.update();
 
     const sunLightColor = '#fff';
-    const sunLightIntensity = 10000;
+    const sunLightIntensity = 100000;
     const sunLight = new THREE.PointLight(sunLightColor, sunLightIntensity);
     sunLight.position.set(0, 0, 0);
     scene.add(sunLight);
     const sphereSize = 40;
 
     // SUN HELPER - INSIDE SUN
-    const pointLightHelper = new THREE.PointLightHelper(sunLight, sphereSize);
+    const pointLightHelper = new THREE.PointLightHelper(sunLight, sphereSize, 'yellow');
     scene.add(pointLightHelper);
 
-    const sunOrbit = new THREE.Object3D();
-    const sunGeometry = new THREE.SphereGeometry(RADIUS_CONTROLS.SUN, 124, 124);
-    const sunMaterial = new THREE.MeshBasicMaterial({ map: textureLoader.load(sunTexture) });
-    const sunMesh = new THREE.Mesh(sunGeometry, sunMaterial);
+    const Sun = new StarSun(textureLoader);
 
-    sunOrbit.add(sunMesh);
+    // Tworzymy "orbitę" wokół obiektu (linia okręgu)
+    const curve = new THREE.EllipseCurve(
+        0, 0,            // Środek elipsy
+        200, 300,            // Promienie elipsy
+        0, 2 * Math.PI,   // Zakres kątowy
+        true,            // Kierunek
+        0                 // Kąt początkowy
+    );
+    
+    const points = curve.getPoints(100);
+    const geometry = new THREE.BufferGeometry().setFromPoints(points);
+    const material = new THREE.LineBasicMaterial({ color: 'white' });
+    
+    const orbit = new THREE.Line(geometry, material);
+    orbit.rotation.x = Math.PI / 2; // Obrót w płaszczyźnie XY
+    scene.add(orbit);
 
-    const earthOrbit = new THREE.Object3D();
-	earthOrbit.add(axesHelper)
+    const Earth = new PlanetEarth(textureLoader);
+    Earth.object.add(axesHelper);
+    scene.add(Earth.object)
 
-    const earthOrbitLine = new THREE.CircleGeometry(100, 1000);
-    earthOrbitLine.rotateX(Math.PI / 2);
-    const earthOrbitLineMaterial = new THREE.LineDashedMaterial( { color: 'black' } );
-    const earthOrbitLineMesh = new THREE.Line( earthOrbitLine, earthOrbitLineMaterial );
-    scene.add(earthOrbitLineMesh)
-    const earthGeometry = new THREE.SphereGeometry(RADIUS_CONTROLS.EARTH, 8, 8);
-    const earthMaterial = new THREE.MeshPhongMaterial({ map: textureLoader.load(earthTexture) });
-    const earthMesh = new THREE.Mesh(earthGeometry, earthMaterial);
-    earthOrbit.position.x = -200;
-    earthOrbit.add(earthMesh);
-    sunOrbit.add(earthOrbit);
-    scene.add(sunOrbit);
+    scene.add(Sun.object);
 
 	const earthRotationSetter = (time: number) => {
+        // TODO Rozdzielenie rotacji ziemi od słońca
 		const divider = 640
-		earthOrbit.rotation.x = time / divider
-		earthOrbit.rotation.y = time / divider
+		Earth.object.rotation.x = time / divider
+		Earth.object.rotation.y = time / divider
 
-		/**
-		 * @TODO
-		 */
-		// Słonce wprawia w obrót ziemię. Trzeba to wyizolować. Każda planeta ma się poruszać osobno w swoim tempie i po swojej orbicie
-		sunOrbit.rotation.x = time / divider
-		sunOrbit.rotation.y = time / divider
+		Sun.object.rotation.x = time / divider
+		Sun.object.rotation.y = time / divider
 	}
 
     function renderInLoop(time: number) {
@@ -123,9 +119,12 @@ function main() {
 		// Do implementacji obracanie poszczególnych sfer w układzie.
         // camera.position.x = worldOrbitRadius * Math.cos(angle);
         // camera.position.z = worldOrbitRadius * Math.sin(angle);
+
+        const earthOrbitPositionInTime = curve.getPoint(time / 10000 )
+        Earth.object.position.set(earthOrbitPositionInTime.x, 0, earthOrbitPositionInTime.y);
 		earthRotationSetter(time);
-		earthOrbit.rotation.z = time / 100
-        camera.lookAt(earthOrbit.position);
+		Earth.object.rotation.z = time / 100
+        
         controls.update();
         renderer.render(scene, camera);
     }
