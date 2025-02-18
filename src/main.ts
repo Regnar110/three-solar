@@ -1,23 +1,17 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import spacetexture from './textures/milkyway.jpg'
-import sunTexture from './textures/sun.jpg'
 import { PlanetEarth } from './planets/Earth';
 import { StarSun } from './planets/Sun';
-
-const RADIUS_CONTROLS = {
-    SUN: 20,
-    EARTH: 3
-}
+import { PickHelper } from './lib/PickHelper';
 
 function main() {
-    const canvasRootEl = document.getElementById('root');
+    const canvasRootEl = <HTMLCanvasElement>document.getElementById('root');
     const scene = new THREE.Scene();
     const renderer = new THREE.WebGLRenderer({ antialias: true, canvas: canvasRootEl! });
 
     renderer.setSize(window.innerWidth, window.innerHeight);
 
-    // Ładowanie tekstury jako tła sceny
     const textureLoader = new THREE.TextureLoader();
     textureLoader.load(
         spacetexture,
@@ -37,11 +31,9 @@ function main() {
     const aspect = window.innerWidth / window.innerHeight;
     const camera = new THREE.PerspectiveCamera(fov, aspect, near, far);
 	camera.position.set( 0, 0, 400 )
-
+    const pickHelper = new PickHelper();
+    scene.add(pickHelper.highlightPointLight)
 	const controls = new OrbitControls( camera, renderer.domElement );
-
-	//controls.addEventListener( 'change', render ); // call this only in static scenes (i.e., if there is no animation loop)
-
     // damping - efekt poślizgu kamery
 	controls.enableDamping = true; // an animation loop is required when either damping or auto-rotation are enabled
 	controls.dampingFactor = 0.05;
@@ -49,7 +41,7 @@ function main() {
 	controls.screenSpacePanning = false;
 
     //Minimalny dystans kamery od centrum sceny
-	controls.minDistance = 500;
+	controls.minDistance = 0;
 
     // maksymalny dystans kamery od centrum sceny
 	controls.maxDistance = Infinity;
@@ -101,7 +93,6 @@ function main() {
     scene.add(Sun.object);
 
 	const earthRotationSetter = (time: number) => {
-        // TODO Rozdzielenie rotacji ziemi od słońca
 		const divider = 640
 		Earth.object.rotation.x = time / divider
 		Earth.object.rotation.y = time / divider
@@ -109,6 +100,53 @@ function main() {
 		Sun.object.rotation.x = time / divider
 		Sun.object.rotation.y = time / divider
 	}
+
+
+    //PICKING
+    const pickPosition = {x: 0, y: 0};
+
+    function getCanvasRelativePosition(event) {
+        const rect = canvasRootEl?.getBoundingClientRect();
+
+        return {
+            x: (event.clientX - rect.left) * canvasRootEl.width / rect.width,
+            y: (event.clientY - rect.top) * canvasRootEl.height / rect.height
+        }
+    }
+
+    function setPickPosition(event) {
+        const pos = getCanvasRelativePosition(event);
+
+        pickPosition.x = (pos.x / canvasRootEl.width ) *  2 - 1;
+        pickPosition.y = (pos.y / canvasRootEl.height) * -2 + 1;  // note we flip Y
+    }
+
+    function clearPickPosition() {
+        // unlike the mouse which always has a position
+        // if the user stops touching the screen we want
+        // to stop picking. For now we just pick a value
+        // unlikely to pick something
+        pickPosition.x = -100000;
+        pickPosition.y = -100000;
+      }
+
+    window.addEventListener('mousemove', setPickPosition);
+    window.addEventListener('mouseout', clearPickPosition);
+    window.addEventListener('mouseleave', clearPickPosition);
+
+
+    //MOBILE PICK
+    window.addEventListener('touchstart', (event) => {
+        // prevent the window from scrolling
+        event.preventDefault();
+        setPickPosition(event.touches[0]);
+    }, {passive: false});
+       
+    window.addEventListener('touchmove', (event) => {
+        setPickPosition(event.touches[0]);
+    });
+       
+    window.addEventListener('touchend', clearPickPosition);
 
     function renderInLoop(time: number) {
         time *= 0.05;
@@ -125,6 +163,8 @@ function main() {
 		earthRotationSetter(time);
 		Earth.object.rotation.z = time / 100
         
+        pickHelper.pick(pickPosition, scene, camera, time);
+
         controls.update();
         renderer.render(scene, camera);
     }
